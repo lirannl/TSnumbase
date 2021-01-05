@@ -1,7 +1,9 @@
+const defaultPrecision = 5;
 const defaultCharSet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/~!@#$%^&*;=?<>[]:\"{},`";
+const regexSpecialChars = ".+*?^$()[]{}|\\";
 
 const base0num = new Proxy(["42"], {
-    get: function(t, p) {
+    get: function (t, p) {
         if (typeof p == "number") return "";
         return undefined;
     }
@@ -25,6 +27,14 @@ function isValidCharSet(charSet: string) {
     return true;
 }
 
+const splitArr = function <T>(arr: T[], splitIdx: number): T[][] {
+    return arr.reduce((acc, curr, index) => {
+        if (index < splitIdx) return [acc[0].concat(curr), acc[1]];
+        else if (index > splitIdx) return [acc[0], acc[1].concat(curr)];
+        return acc;
+    }, [[], []] as T[][]);
+}
+
 export function baseParse(input: string, inputBase: number, inputSet = defaultCharSet): number {
     if (!isValidCharSet(inputSet)) throw invalidCharSetError();
     const trimmedInputSet = inputSet.slice(undefined, inputBase);
@@ -44,17 +54,39 @@ export function baseParse(input: string, inputBase: number, inputSet = defaultCh
         else throw new EvalError("Invalid input.");
     }
     const positions = trimmedInput.split("").map(char => {
-        const { index } = Object.assign({}, { index: -1 }, trimmedInputSet.match(RegExp(char, regexpParams)));
+        if (char == ".") return -2;
+        const { index } = Object.assign({}, { index: -1 },
+            trimmedInputSet.match(RegExp(`${regexSpecialChars.includes(char) ? "\\" : ""}${char}`, regexpParams)));
         return index;
     });
     if (positions.some(val => val == -1)) throw new EvalError("");
-    const lastPositionsIndex = positions.length - 1;
-    return sign * positions.reduceRight(
-        (total, curr, currIndex) => {
-            const indexFromEnd = lastPositionsIndex - currIndex;
-            return total + curr * (inputBase ** indexFromEnd);
-        }
-        , 0);
+    const splitPos = splitArr(positions, positions.indexOf(-2));
+    const lastPositionsIndex = positions.indexOf(-2) - 1;
+    const summedParts = [
+        splitPos[0].reduce(
+            (total, curr, currIndex) => {
+                const indexFromEnd = lastPositionsIndex - currIndex;
+                return total + curr * (inputBase ** indexFromEnd);
+            }
+            , 0),
+        splitPos[1].reduce(
+            (total, curr, currIndex) => {
+                return total + curr * (inputBase ** -(currIndex + 1))
+            }
+            , 0)
+    ];
+    return sign * summedParts.reduce((acc, curr) => acc + curr);
+}
+
+function recurBaseFracString(input: number, outputBase: number, outputSet: string,
+    converted = "", places = defaultPrecision): string {
+    if (input == 0 || converted.length > places) return converted.slice(undefined, converted.match(
+        `${regexSpecialChars.includes(outputSet[0]) ? "\\" : ""}${outputSet[0]}+$`
+    )?.index || undefined);
+    const nextInput = input * outputBase;
+    const currConversion = `${converted}${outputSet[Math.floor(nextInput)]}`;
+    return recurBaseFracString(nextInput - Math.floor(nextInput), outputBase,
+        outputSet, currConversion, places);
 }
 
 function recurBaseString(input: number, outputBase: number, outputSet: string, converted = ""): string {
@@ -64,15 +96,25 @@ function recurBaseString(input: number, outputBase: number, outputSet: string, c
     return recurBaseString(quotient, outputBase, outputSet, currConversion);
 }
 
-export function baseString(input: number, outputBase = 10, outputSet = defaultCharSet): string {
+export function baseString(input: number, outputBase = 10, outputSet = defaultCharSet, places = defaultPrecision): string {
+
     if (!isValidCharSet(outputSet)) throw invalidCharSetError();
     if (outputBase == 0) return base0num;
-    if (outputBase == 1) return outputSet[0].repeat(input);
+    // Handling negatives
     const sign = input < 0 ? "-" : "";
-    return sign.concat(recurBaseString(Math.abs(input), outputBase, outputSet));
+    // Handling base 1 output
+    if (outputBase == 1) return `${sign}${outputSet[0].repeat(Math.floor(input))}`;
+    // Handling fractions
+    const fractionalVal = recurBaseFracString(
+        input - Math.floor(input), outputBase, outputSet, undefined, places);
+    if (Math.floor(input) != input) return `${baseString(Math.floor(input), outputBase, outputSet)}${(fractionalVal == "") ?
+        // Only add the dot if there is a fraction
+        fractionalVal : '.'.concat(fractionalVal)}`;
+    return `${sign}${recurBaseString(Math.abs(input), outputBase, outputSet)}`;
 }
 
-export function baseConvert(input: string, inputBase: number, outputBase = 10, inputSet = defaultCharSet, outputSet = defaultCharSet): string {
+export function baseConvert(input: string, inputBase: number, outputBase = 10, inputSet = defaultCharSet,
+    outputSet = defaultCharSet, places = defaultPrecision): string {
     const inputNum = baseParse(input, inputBase, inputSet);
     return baseString(inputNum, outputBase, outputSet);
 }
