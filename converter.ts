@@ -1,14 +1,7 @@
-const defaultPrecision = 5;
+const defaultPrecision = 12;
 const defaultCharSet =
   '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+/~!@#$%^&*;=?<>[]:"{},`';
 const regexSpecialChars = ".+*?^$()[]{}|\\";
-
-/*const base0num = new Proxy(["42"], {
-    get: function (t, p) {
-        if (typeof p == "number") return "";
-        return undefined;
-    }
-}) as unknown as string;*/
 
 const invalidCharSetError = () =>
   new EvalError(
@@ -101,9 +94,9 @@ function recurBaseFracString(
   outputBase: number,
   outputSet: string,
   converted = "",
-  places = defaultPrecision,
+  fracPlaces = defaultPrecision,
 ): string {
-  if (input == 0 || converted.length > places) {
+  if (input == 0 || converted.length > fracPlaces) {
     return converted.slice(
       undefined,
       converted.match(
@@ -120,7 +113,7 @@ function recurBaseFracString(
     outputBase,
     outputSet,
     currConversion,
-    places,
+    fracPlaces,
   );
 }
 
@@ -140,7 +133,7 @@ function baseString(
   input: number,
   outputBase = 10,
   outputSet = defaultCharSet,
-  places = defaultPrecision,
+  fracPlaces = defaultPrecision,
 ): string {
   if (!isValidCharSet(outputSet)) throw invalidCharSetError();
   /*if (outputBase == 0) return base0num;*/
@@ -156,7 +149,7 @@ function baseString(
     outputBase,
     outputSet,
     undefined,
-    places,
+    fracPlaces,
   );
   if (Math.floor(input) != input) {
     return `${baseString(Math.floor(input), outputBase, outputSet)}${
@@ -175,10 +168,10 @@ function baseConvert(
   outputBase = 10,
   inputSet = defaultCharSet,
   outputSet = defaultCharSet,
-  places = defaultPrecision,
+  fracPlaces = defaultPrecision,
 ): string {
   const inputNum = baseParse(input, inputBase, inputSet);
-  return baseString(inputNum, outputBase, outputSet);
+  return baseString(inputNum, outputBase, outputSet, fracPlaces);
 }
 
 export { baseConvert, baseParse, baseString };
